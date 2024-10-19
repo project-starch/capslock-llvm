@@ -682,6 +682,22 @@ def OR   : ALU_rr<0b0000000, 0b110, "or", Commutable=1>,
 def AND  : ALU_rr<0b0000000, 0b111, "and", Commutable=1>,
            Sched<[WriteIALU, ReadIALU, ReadIALU]>;
 
+
+// CapsLock instructions
+let hasSideEffects = 1, mayLoad = 0, mayStore = 1 in {
+def GENCAP  : RVInstR<0b1000000, 0b001, OPC_CUSTOM_2, (outs GPR:$rd), (ins GPR:$rs1, GPR:$rs2),
+              "gencap", "$rd, $rs1, $rs2">;
+def DROP    : RVInstR<0b0001011, 0b001, OPC_CUSTOM_2, (outs GPR:$rd), (ins GPR:$rs1, GPR:$rs2),
+              "drop", "$rd, $rs1, $rs2">; // rd and rs2 are unused
+def SAVESP  : RVInstR<0b0001010, 0b001, OPC_CUSTOM_2, (outs GPR:$rd), (ins GPR:$rs1, GPR:$rs2),
+              "savesp", "$rd, $rs1, $rs2">; // rd and rs2 are unused
+}
+
+let hasSideEffects = 1, mayLoad = 1, mayStore = 0 in {
+def LOADSP  : RVInstR<0b0001001, 0b001, OPC_CUSTOM_2, (outs GPR:$rd), (ins GPR:$rs1, GPR:$rs2),
+              "loadsp", "$rd, $rs1, $rs2">; // rs1 and rs2 are unused
+}
+
 let hasSideEffects = 1, mayLoad = 0, mayStore = 0 in {
 def FENCE : RVInstI<0b000, OPC_MISC_MEM, (outs),
                     (ins fencearg:$pred, fencearg:$succ),
