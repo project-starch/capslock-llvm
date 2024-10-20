@@ -698,6 +698,13 @@ def LOADSP  : RVInstR<0b0001001, 0b001, OPC_CUSTOM_2, (outs GPR:$rd), (ins GPR:$
               "loadsp", "$rd, $rs1, $rs2">; // rs1 and rs2 are unused
 }
 
+let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in {
+def SHRINK  : RVInstR<0b0000001, 0b001, OPC_CUSTOM_2, (outs GPR:$rd), (ins GPR:$rs1, GPR:$rs2),
+              "shrink", "$rd, $rs1, $rs2">;
+def SHRINKTO : RVInstI<0b000, OPC_CUSTOM_2, (outs GPR:$rd),
+              (ins GPR:$rs1, simm12:$imm12), "shrinkto", "$rd, $rs1, $imm12">;
+}
+
 let hasSideEffects = 1, mayLoad = 0, mayStore = 0 in {
 def FENCE : RVInstI<0b000, OPC_MISC_MEM, (outs),
                     (ins fencearg:$pred, fencearg:$succ),
