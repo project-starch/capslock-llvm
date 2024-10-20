@@ -698,6 +698,12 @@ def LOADSP  : RVInstR<0b0001001, 0b001, OPC_CUSTOM_2, (outs GPR:$rd), (ins GPR:$
               "loadsp", "$rd, $rs1, $rs2">; // rs1 and rs2 are unused
 }
 
+let hasSideEffects = 0, mayLoad = 1, mayStore = 0 in {
+def GETSP  : RVInstI<0b101, OPC_CUSTOM_2, (outs GPR:$rd),
+              (ins GPR:$rs1, simm12:$imm12), "getsp", "$rd, $rs1, $imm12">;
+              // rs1 is not used
+}
+
 let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in {
 def SHRINK  : RVInstR<0b0000001, 0b001, OPC_CUSTOM_2, (outs GPR:$rd), (ins GPR:$rs1, GPR:$rs2),
               "shrink", "$rd, $rs1, $rs2">;

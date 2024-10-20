@@ -492,24 +492,29 @@ bool RISCVRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
     Register DestReg;
     DestReg = MI.getOperand(0).getReg();
 
-    adjustReg(*II->getParent(), II, DL, DestReg, FrameReg, OriginalOffset,
-              MachineInstr::NoFlags, std::nullopt);
-    {
-      /* shrink bounds */
-        int64_t ObjectSize = MFI.getObjectSize(FrameIndex);
-        const auto &STI = MF.getSubtarget<RISCVSubtarget>();
-        const RISCVInstrInfo *TII = STI.getInstrInfo();
-        // Register ScratchReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
-        // TII->movImm(*II->getParent(), II, DL, ScratchReg, ObjectSize);
-        assert(DestReg != SPReg && DestReg != FrameReg);
-        // BuildMI(*II->getParent(), II, DL, TII->get(RISCV::ADD), ScratchReg)
-        //   .addReg(DestReg)
-        //   .addReg(ScratchReg);
-        assert(ObjectSize < 2048);
-        BuildMI(*II->getParent(), II, DL, TII->get(RISCV::SHRINKTO), DestReg)
-          .addReg(DestReg)
-          .addImm(ObjectSize);
-    }
+    // adjustReg(*II->getParent(), II, DL, DestReg, FrameReg, OriginalOffset,
+    //           MachineInstr::NoFlags, std::nullopt);
+    // {
+    //   /* shrink bounds */
+    //     int64_t ObjectSize = MFI.getObjectSize(FrameIndex);
+    //     const auto &STI = MF.getSubtarget<RISCVSubtarget>();
+    //     const RISCVInstrInfo *TII = STI.getInstrInfo();
+    //     // Register ScratchReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
+    //     // TII->movImm(*II->getParent(), II, DL, ScratchReg, ObjectSize);
+    //     assert(DestReg != SPReg && DestReg != FrameReg);
+    //     // BuildMI(*II->getParent(), II, DL, TII->get(RISCV::ADD), ScratchReg)
+    //     //   .addReg(DestReg)
+    //     //   .addReg(ScratchReg);
+    //     assert(ObjectSize < 2048);
+    //     BuildMI(*II->getParent(), II, DL, TII->get(RISCV::SHRINKTO), DestReg)
+    //       .addReg(DestReg)
+    //       .addImm(ObjectSize);
+    // }
+    const auto &STI = MF.getSubtarget<RISCVSubtarget>();
+    const RISCVInstrInfo *TII = STI.getInstrInfo();
+    BuildMI(*II->getParent(), II, DL, TII->get(RISCV::GETSP), DestReg)
+      .addReg(RISCV::X0)
+      .addImm(FrameIndex + MFI.getNumFixedObjects());
     adjustReg(*II->getParent(), II, DL, DestReg, DestReg, Offset-OriginalOffset,
               MachineInstr::NoFlags, std::nullopt);
 
