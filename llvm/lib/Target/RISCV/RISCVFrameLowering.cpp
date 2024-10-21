@@ -722,17 +722,17 @@ void RISCVFrameLowering::emitPrologue(MachineFunction &MF,
     Register ScratchRegEnd = MRI.createVirtualRegister(&RISCV::GPRRegClass);
     RI->adjustReg(MBB, MBBI, DL, ScratchReg, FrameReg,
       Offset, MachineInstr::FrameSetup, std::nullopt);
-    BuildMI(MBB, MBBI, DL, TII->get(RISCV::ADDI), ScratchRegEnd)
-      .addReg(ScratchReg)
-      .addImm(MFI.getObjectSize(idx))
-      .setMIFlag(MachineInstr::FrameSetup);
+    RI->adjustReg(MBB, MBBI, DL, ScratchRegEnd, ScratchReg,
+                  StackOffset::getFixed(std::max(8, (int)MFI.getObjectSize(idx))),
+                  MachineInstr::FrameSetup, std::nullopt);
     BuildMI(MBB, MBBI, DL, TII->get(RISCV::GENCAP), ScratchReg)
       .addReg(ScratchReg)
       .addReg(ScratchRegEnd, RegState::Kill)
       .setMIFlag(MachineInstr::FrameSetup);
     BuildMI(MBB, MBBI, DL, TII->get(RISCV::SAVESP), RISCV::X0)
       .addReg(ScratchReg, RegState::Kill)
-      .addReg(RISCV::X0);
+      .addReg(RISCV::X0)
+      .setMIFlag(MachineInstr::FrameSetup);
   }
 }
 

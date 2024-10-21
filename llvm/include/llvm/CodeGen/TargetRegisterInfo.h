@@ -492,6 +492,10 @@ public:
     return nullptr;
   }
 
+  virtual bool requireFrameReference() const {
+    return true;
+  }
+
   /// Return a register mask for the registers preserved by the unwinder,
   /// or nullptr if no custom mask is needed.
   virtual const uint32_t *

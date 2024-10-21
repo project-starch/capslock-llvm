@@ -126,7 +126,11 @@ bool LocalStackSlotPass::runOnMachineFunction(MachineFunction &MF) {
   calculateFrameObjectOffsets(MF);
 
   // Insert virtual base registers to resolve frame index references.
-  bool UsedBaseRegs = insertFrameReferenceRegisters(MF);
+  bool UsedBaseRegs;
+  if (TRI->requireFrameReference())
+    UsedBaseRegs = insertFrameReferenceRegisters(MF);
+  else
+    UsedBaseRegs = false;
 
   // Tell MFI whether any base registers were allocated. PEI will only
   // want to use the local block allocations from this pass if there were any.

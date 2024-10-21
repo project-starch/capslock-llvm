@@ -47,6 +47,8 @@ struct RISCVRegisterInfo : public RISCVGenRegisterInfo {
                  StackOffset Offset, MachineInstr::MIFlag Flag,
                  MaybeAlign RequiredAlign) const;
 
+  bool requireFrameReference() const override;
+
   bool eliminateFrameIndex(MachineBasicBlock::iterator MI, int SPAdj,
                            unsigned FIOperandNum,
                            RegScavenger *RS = nullptr) const override;

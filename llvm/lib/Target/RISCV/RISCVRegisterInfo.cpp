@@ -24,6 +24,7 @@
 #include "llvm/CodeGen/TargetInstrInfo.h"
 #include "llvm/IR/DebugInfoMetadata.h"
 #include "llvm/Support/ErrorHandling.h"
+#include <csignal>
 
 #define GET_REGINFO_TARGET_DESC
 #include "RISCVGenRegisterInfo.inc"
@@ -427,6 +428,8 @@ bool RISCVRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
                                             RegScavenger *RS) const {
   assert(SPAdj == 0 && "Unexpected non-zero SPAdj value");
 
+  // std::raise(SIGTRAP);
+
   MachineInstr &MI = *II;
   MachineFunction &MF = *MI.getParent()->getParent();
   MachineRegisterInfo &MRI = MF.getRegInfo();
@@ -435,6 +438,8 @@ bool RISCVRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   DebugLoc DL = MI.getDebugLoc();
 
   int FrameIndex = MI.getOperand(FIOperandNum).getIndex();
+  // fprintf(stderr, "FrameIndex %s %d %d %lu %lu %d\n", MF.getName().str().c_str(), FrameIndex, MFI.getNumFixedObjects(), MFI.getObjectSize(FrameIndex), MI.getOpcode(),
+  //   MI.isPseudo());
   Register FrameReg;
   StackOffset Offset =
       getFrameLowering(MF)->getFrameIndexReference(MF, FrameIndex, FrameReg);
@@ -488,6 +493,8 @@ bool RISCVRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
     }
   }
 
+  assert(FrameIndex >= MFI.getObjectIndexBegin() && FrameIndex < MFI.getObjectIndexEnd());
+
   if (MI.getOpcode() == RISCV::ADDI) {
     Register DestReg;
     DestReg = MI.getOperand(0).getReg();
@@ -521,19 +528,44 @@ bool RISCVRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
     MI.getOperand(FIOperandNum).ChangeToRegister(DestReg, /*IsDef*/false,
                                                  /*IsImp*/false,
                                                  /*IsKill*/true);
+  // } else if (OriginalOffset.getScalable() || OriginalOffset.getFixed()) {
+  //   const auto &STI = MF.getSubtarget<RISCVSubtarget>();
+  //   const RISCVInstrInfo *TII = STI.getInstrInfo();
+
+  //   Register DestReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
+  //   BuildMI(*II->getParent(), II, DL, TII->get(RISCV::GETSP), DestReg)
+  //     .addReg(RISCV::X0)
+  //     .addImm(FrameIndex + MFI.getNumFixedObjects());
+  //   adjustReg(*II->getParent(), II, DL, DestReg, DestReg, Offset-OriginalOffset,
+  //             MachineInstr::NoFlags, std::nullopt);
+
+  //   MI.getOperand(FIOperandNum).ChangeToRegister(DestReg, /*IsDef*/false,
+  //                                                /*IsImp*/false,
+  //                                                /*IsKill*/true);
   } else if (Offset.getScalable() || Offset.getFixed()) {
-    Register DestReg;
-    DestReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
+    Register DestReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
     adjustReg(*II->getParent(), II, DL, DestReg, FrameReg, Offset,
               MachineInstr::NoFlags, std::nullopt);
     MI.getOperand(FIOperandNum).ChangeToRegister(DestReg, /*IsDef*/false,
                                                  /*IsImp*/false,
                                                  /*IsKill*/true);
   } else {
+    const auto &STI = MF.getSubtarget<RISCVSubtarget>();
+    const RISCVRegisterInfo *RI = STI.getRegisterInfo();
+    assert(!FrameReg.isVirtual() && (FrameReg == SPReg || FrameReg == RI->getFrameRegister(MF)));
     MI.getOperand(FIOperandNum).ChangeToRegister(FrameReg, /*IsDef*/false,
                                                  /*IsImp*/false,
                                                  /*IsKill*/false);
   }
+  // } else if (OriginalOffset.getScalable() || OriginalOffset.getFixed()) {
+  //   Register DestReg;
+  //   DestReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
+  //   adjustReg(*II->getParent(), II, DL, DestReg, FrameReg, Offset,
+  //             MachineInstr::NoFlags, std::nullopt);
+  //   fprintf(stderr, "Hoola\n");
+  //   MI.getOperand(FIOperandNum).ChangeToRegister(DestReg, /*IsDef*/false,
+  //                                                /*IsImp*/false,
+  //                                                /*IsKill*/true);
 
 
   // If after materializing the adjustment, we have a pointless ADDI, remove it
@@ -669,6 +701,10 @@ Register RISCVRegisterInfo::materializeFrameBaseRegister(MachineBasicBlock *MBB,
       .addFrameIndex(FrameIdx)
       .addImm(Offset);
   return BaseReg;
+}
+
+bool RISCVRegisterInfo::requireFrameReference() const {
+  return false;
 }
 
 // Resolve a frame index operand of an instruction to reference the

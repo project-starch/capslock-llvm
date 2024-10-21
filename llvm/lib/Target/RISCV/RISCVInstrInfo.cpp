@@ -761,6 +761,9 @@ MachineInstr *RISCVInstrInfo::foldMemoryOperandImpl(
     MachineFunction &MF, MachineInstr &MI, ArrayRef<unsigned> Ops,
     MachineBasicBlock::iterator InsertPt, int FrameIndex, LiveIntervals *LIS,
     VirtRegMap *VRM) const {
+
+  return nullptr; // never fold as this does not work for CapsLock
+
   const MachineFrameInfo &MFI = MF.getFrameInfo();
 
   // The below optimizations narrow the load so they are only valid for little
