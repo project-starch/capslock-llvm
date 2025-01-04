@@ -494,6 +494,8 @@ bool RISCVRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   }
 
   assert(FrameIndex >= MFI.getObjectIndexBegin() && FrameIndex < MFI.getObjectIndexEnd());
+  assert(FrameIndex + MFI.getNumFixedObjects() < 2048);
+  assert(MFI.getNumbFixedObjects() + MFI.getObjectIndexBegin() == 0);
 
   if (MI.getOpcode() == RISCV::ADDI) {
     Register DestReg;
@@ -528,27 +530,32 @@ bool RISCVRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
     MI.getOperand(FIOperandNum).ChangeToRegister(DestReg, /*IsDef*/false,
                                                  /*IsImp*/false,
                                                  /*IsKill*/true);
-  // } else if (OriginalOffset.getScalable() || OriginalOffset.getFixed()) {
-  //   const auto &STI = MF.getSubtarget<RISCVSubtarget>();
-  //   const RISCVInstrInfo *TII = STI.getInstrInfo();
+  } else if (OriginalOffset.getScalable() || OriginalOffset.getFixed()) {
+    const auto &STI = MF.getSubtarget<RISCVSubtarget>();
+    const RISCVInstrInfo *TII = STI.getInstrInfo();
 
-  //   Register DestReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
-  //   BuildMI(*II->getParent(), II, DL, TII->get(RISCV::GETSP), DestReg)
-  //     .addReg(RISCV::X0)
-  //     .addImm(FrameIndex + MFI.getNumFixedObjects());
-  //   adjustReg(*II->getParent(), II, DL, DestReg, DestReg, Offset-OriginalOffset,
-  //             MachineInstr::NoFlags, std::nullopt);
+    // if (MI.getFlag(MachineInstr::FrameSetup) || MI.getOperand(0).getReg() == RISCV::X1) {
+    //   // the stack capabilities haven't been created yet, just do normal
+    //   // memory access
+    //   Register DestReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
+    //   adjustReg(*II->getParent(), II, DL, DestReg, FrameReg, Offset,
+    //             MachineInstr::NoFlags, std::nullopt);
+    //   MI.getOperand(FIOperandNum).ChangeToRegister(DestReg, /*IsDef*/false,
+    //                                               /*IsImp*/false,
+    //                                               /*IsKill*/true);
+    // } else {
+      Register DestReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
+      BuildMI(*II->getParent(), II, DL, TII->get(RISCV::GETSP), DestReg)
+        .addReg(RISCV::X0)
+        .addImm(FrameIndex + MFI.getNumFixedObjects());
+      adjustReg(*II->getParent(), II, DL, DestReg, DestReg, Offset-OriginalOffset,
+                MachineInstr::NoFlags, std::nullopt);
 
-  //   MI.getOperand(FIOperandNum).ChangeToRegister(DestReg, /*IsDef*/false,
-  //                                                /*IsImp*/false,
-  //                                                /*IsKill*/true);
-  } else if (Offset.getScalable() || Offset.getFixed()) {
-    Register DestReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
-    adjustReg(*II->getParent(), II, DL, DestReg, FrameReg, Offset,
-              MachineInstr::NoFlags, std::nullopt);
-    MI.getOperand(FIOperandNum).ChangeToRegister(DestReg, /*IsDef*/false,
-                                                 /*IsImp*/false,
-                                                 /*IsKill*/true);
+      MI.getOperand(FIOperandNum).ChangeToRegister(DestReg, /*IsDef*/false,
+                                                  /*IsImp*/false,
+                                                  /*IsKill*/true);
+    // }
+  // } else if (Offset.getScalable() || Offset.getFixed()) {
   } else {
     const auto &STI = MF.getSubtarget<RISCVSubtarget>();
     const RISCVRegisterInfo *RI = STI.getRegisterInfo();
