@@ -719,23 +719,12 @@ void RISCVFrameLowering::emitPrologue(MachineFunction &MF,
     StackOffset Offset = StackOffset::getFixed(i->first);
     RI->adjustReg(MBB, MBBI, DL, FrameReg, FrameReg,
       Offset, MachineInstr::FrameSetup, std::nullopt);
-    // RI->adjustReg(MBB, MBBI, DL, ScratchRegEnd, ScratchReg,
-    //               StackOffset::getFixed(std::max(8, (int)MFI.getObjectSize(idx))),
-    //               MachineInstr::FrameSetup, std::nullopt);
     BuildMI(MBB, MBBI, DL, TII->get(RISCV::GENCAPSTACK), RISCV::X0)
       .addReg(FrameReg)
       .addImm(i->second)
       .setMIFlag(MachineInstr::FrameSetup);
     RI->adjustReg(MBB, MBBI, DL, FrameReg, FrameReg,
       -Offset, MachineInstr::FrameSetup, std::nullopt);
-    // BuildMI(MBB, MBBI, DL, TII->get(RISCV::GENCAP), ScratchReg)
-    //   .addReg(ScratchReg)
-    //   .addReg(ScratchRegEnd, RegState::Kill)
-    //   .setMIFlag(MachineInstr::FrameSetup);
-    // BuildMI(MBB, MBBI, DL, TII->get(RISCV::SAVESP), RISCV::X0)
-    //   .addReg(ScratchReg, RegState::Kill)
-    //   .addReg(RISCV::X0)
-    //   .setMIFlag(MachineInstr::FrameSetup);
   }
 
 }
@@ -835,25 +824,6 @@ void RISCVFrameLowering::emitEpilogue(MachineFunction &MF,
   if (StackSize != 0) {
     RI->adjustReg(MBB, MBBI, DL, SPReg, SPReg, StackOffset::getFixed(StackSize),
                   MachineInstr::FrameDestroy, getStackAlign());
-
-    // For CapsLock
-    MachineRegisterInfo &MRI = MF.getRegInfo();
-    const RISCVInstrInfo *TII = STI.getInstrInfo();
-
-    // popping out all frame objects
-    // int start_idx = MFI.getObjectIndexBegin();
-    // int end_idx = MFI.getObjectIndexEnd();
-    // for(int idx = start_idx; idx < end_idx; idx ++) {
-    //   Register ScratchReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
-    //   BuildMI(MBB, MBBI, DL, TII->get(RISCV::LOADSP), ScratchReg).addReg(RISCV::X0).addReg(RISCV::X0)
-    //     .setMIFlag(MachineInstr::FrameDestroy);
-    //   BuildMI(MBB, MBBI, DL, TII->get(RISCV::DROP), RISCV::X0).addReg(ScratchReg, RegState::Kill).addReg(RISCV::X0)
-    //     .setMIFlag(MachineInstr::FrameDestroy);
-    // }
-
-
-    // BuildMI(MBB, MBBI, DL, TII->get(RISCV::LOADSP), SPReg).addReg(RISCV::X0).addReg(RISCV::X0)
-    //   .setMIFlag(MachineInstr::FrameDestroy);
   }
 
   // Emit epilogue for shadow call stack.
