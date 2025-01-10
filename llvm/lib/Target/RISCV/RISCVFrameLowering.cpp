@@ -25,6 +25,7 @@
 #include <cstdio>
 
 #include <algorithm>
+#include <vector>
 
 using namespace llvm;
 
@@ -561,29 +562,6 @@ void RISCVFrameLowering::emitPrologue(MachineFunction &MF,
                   getStackAlign());
   }
 
-  // CapsLock: generate capabilities for frame objects
-  int start_idx = MFI.getObjectIndexBegin();
-  int end_idx = MFI.getObjectIndexEnd();
-  MachineRegisterInfo &MRI = MF.getRegInfo();
-  for(int idx = end_idx - 1; idx >= start_idx; idx --) {
-    Register FrameReg;
-    StackOffset Offset = getFrameIndexReference(MF, idx, FrameReg);
-    Register ScratchReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
-    Register ScratchRegEnd = MRI.createVirtualRegister(&RISCV::GPRRegClass);
-    RI->adjustReg(MBB, MBBI, DL, ScratchReg, FrameReg,
-      Offset, MachineInstr::FrameSetup, std::nullopt);
-    RI->adjustReg(MBB, MBBI, DL, ScratchRegEnd, ScratchReg,
-                  StackOffset::getFixed(std::max(8, (int)MFI.getObjectSize(idx))),
-                  MachineInstr::FrameSetup, std::nullopt);
-    BuildMI(MBB, MBBI, DL, TII->get(RISCV::GENCAP), ScratchReg)
-      .addReg(ScratchReg)
-      .addReg(ScratchRegEnd, RegState::Kill)
-      .setMIFlag(MachineInstr::FrameSetup);
-    BuildMI(MBB, MBBI, DL, TII->get(RISCV::SAVESP), RISCV::X0)
-      .addReg(ScratchReg, RegState::Kill)
-      .addReg(RISCV::X0)
-      .setMIFlag(MachineInstr::FrameSetup);
-  }
 
 
   // Emit ".cfi_def_cfa_offset RealStackSize"
@@ -722,6 +700,43 @@ void RISCVFrameLowering::emitPrologue(MachineFunction &MF,
     }
   }
 
+  // CapsLock: generate capabilities for frame objects
+  int start_idx = MFI.getObjectIndexBegin();
+  int end_idx = MFI.getObjectIndexEnd();
+  MachineRegisterInfo &MRI = MF.getRegInfo();
+  std::vector< std::pair<int64_t, uint32_t> > stack_objects;
+  for (int idx = end_idx - 1; idx >= start_idx; idx --) {
+    Register FrameReg;
+    StackOffset Offset = getFrameIndexReference(MF, idx, FrameReg);
+    stack_objects.push_back(std::make_pair(Offset.getFixed(), MFI.getObjectSize(idx)));
+  }
+  std::sort(stack_objects.begin(), stack_objects.end());
+  for (auto i = stack_objects.rbegin(); i != stack_objects.rend(); i ++) {
+    Register FrameReg;
+    getFrameIndexReference(MF, 0, FrameReg);
+    Register ScratchReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
+    Register ScratchRegEnd = MRI.createVirtualRegister(&RISCV::GPRRegClass);
+    StackOffset Offset = StackOffset::getFixed(i->first);
+    RI->adjustReg(MBB, MBBI, DL, FrameReg, FrameReg,
+      Offset, MachineInstr::FrameSetup, std::nullopt);
+    // RI->adjustReg(MBB, MBBI, DL, ScratchRegEnd, ScratchReg,
+    //               StackOffset::getFixed(std::max(8, (int)MFI.getObjectSize(idx))),
+    //               MachineInstr::FrameSetup, std::nullopt);
+    BuildMI(MBB, MBBI, DL, TII->get(RISCV::GENCAPSTACK), RISCV::X0)
+      .addReg(FrameReg)
+      .addImm(i->second)
+      .setMIFlag(MachineInstr::FrameSetup);
+    RI->adjustReg(MBB, MBBI, DL, FrameReg, FrameReg,
+      -Offset, MachineInstr::FrameSetup, std::nullopt);
+    // BuildMI(MBB, MBBI, DL, TII->get(RISCV::GENCAP), ScratchReg)
+    //   .addReg(ScratchReg)
+    //   .addReg(ScratchRegEnd, RegState::Kill)
+    //   .setMIFlag(MachineInstr::FrameSetup);
+    // BuildMI(MBB, MBBI, DL, TII->get(RISCV::SAVESP), RISCV::X0)
+    //   .addReg(ScratchReg, RegState::Kill)
+    //   .addReg(RISCV::X0)
+    //   .setMIFlag(MachineInstr::FrameSetup);
+  }
 
 }
 
@@ -826,15 +841,19 @@ void RISCVFrameLowering::emitEpilogue(MachineFunction &MF,
     const RISCVInstrInfo *TII = STI.getInstrInfo();
 
     // popping out all frame objects
-    int start_idx = MFI.getObjectIndexBegin();
-    int end_idx = MFI.getObjectIndexEnd();
-    for(int idx = start_idx; idx < end_idx; idx ++) {
-      Register ScratchReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
-      BuildMI(MBB, MBBI, DL, TII->get(RISCV::LOADSP), ScratchReg).addReg(RISCV::X0).addReg(RISCV::X0)
-        .setMIFlag(MachineInstr::FrameDestroy);
-      BuildMI(MBB, MBBI, DL, TII->get(RISCV::DROP), RISCV::X0).addReg(ScratchReg, RegState::Kill).addReg(RISCV::X0)
-        .setMIFlag(MachineInstr::FrameDestroy);
-    }
+    // int start_idx = MFI.getObjectIndexBegin();
+    // int end_idx = MFI.getObjectIndexEnd();
+    // for(int idx = start_idx; idx < end_idx; idx ++) {
+    //   Register ScratchReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
+    //   BuildMI(MBB, MBBI, DL, TII->get(RISCV::LOADSP), ScratchReg).addReg(RISCV::X0).addReg(RISCV::X0)
+    //     .setMIFlag(MachineInstr::FrameDestroy);
+    //   BuildMI(MBB, MBBI, DL, TII->get(RISCV::DROP), RISCV::X0).addReg(ScratchReg, RegState::Kill).addReg(RISCV::X0)
+    //     .setMIFlag(MachineInstr::FrameDestroy);
+    // }
+
+
+    // BuildMI(MBB, MBBI, DL, TII->get(RISCV::LOADSP), SPReg).addReg(RISCV::X0).addReg(RISCV::X0)
+    //   .setMIFlag(MachineInstr::FrameDestroy);
   }
 
   // Emit epilogue for shadow call stack.
