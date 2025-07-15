@@ -824,6 +824,19 @@ void RISCVFrameLowering::emitEpilogue(MachineFunction &MF,
   if (StackSize != 0) {
     RI->adjustReg(MBB, MBBI, DL, SPReg, SPReg, StackOffset::getFixed(StackSize),
                   MachineInstr::FrameDestroy, getStackAlign());
+
+    MachineRegisterInfo &MRI = MF.getRegInfo();
+    const RISCVInstrInfo *TII = STI.getInstrInfo();
+
+    int start_idx = MFI.getObjectIndexBegin();
+    int end_idx = MFI.getObjectIndexEnd();
+    for(int idx = start_idx; idx < end_idx; idx ++) {
+      Register ScratchReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
+      BuildMI(MBB, MBBI, DL, TII->get(RISCV::LOADSP), ScratchReg).addReg(RISCV::X0).addReg(RISCV::X0)
+        .setMIFlag(MachineInstr::FrameDestroy);
+      BuildMI(MBB, MBBI, DL, TII->get(RISCV::DROP), RISCV::X0).addReg(ScratchReg, RegState::Kill).addReg(RISCV::X0)
+        .setMIFlag(MachineInstr::FrameDestroy);
+    }
   }
 
   // Emit epilogue for shadow call stack.
